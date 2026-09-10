@@ -1,6 +1,6 @@
-# Setup
+## Setup
 
-## MacOS
+### MacOS
 
 1. Install Homebrew
 
@@ -32,8 +32,24 @@ gcc main.c -o game -L/usr/local/lib -I/usr/local/include -lraylib -framework Cor
 
 Directories change depending on the hardware being used.
 
-# Developer tools
+## Developer tools
 
-## Code formatter
+### Code formatter
 
 This project uses `clang-format` and Google style to format C code. 
+
+1. Installation
+
+```
+# Install on windows
+winget install -e --id LLVM.LLVM
+
+# Install on MacOS
+brew install clang-format
+```
+
+2. Format code
+
+```
+clang-format -style=file -i ${FILEPATH}
+```
