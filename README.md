@@ -31,3 +31,9 @@ gcc main.c -o game -L/usr/local/lib -I/usr/local/include -lraylib -framework Cor
 ```
 
 Directories change depending on the hardware being used.
+
+# Developer tools
+
+## Code formatter
+
+This project uses `clang-format` and Google style to format C code. 
