@@ -31,7 +31,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <time.h>
 #include "raylib.h"
 
 const int screenWidth = 800;
@@ -92,11 +92,19 @@ typedef struct Food
 Food *create_new_food(void)
 {
   Food *food = calloc(1, sizeof(Food));
-  food->position.x = 40;
-  food->position.y = 40;
   food->size.x = 20;
   food->size.y = 20;
   food->type = APPLE_FRUIT;
+
+  // Generate random position for the food
+  srand(time(NULL)); // seed random number generator with current time
+  int min = 0;
+  int max_x = screenWidth - food->size.x;
+  int max_y = screenHeight - food->size.y;
+
+  food->position.x = (rand() % (max_x - min + 1)) + min;
+  food->position.y = (rand() % (max_y - min + 1)) + min;
+
   return food;
 }
 
