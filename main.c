@@ -9,6 +9,7 @@ const int screenHeight = 450;
 const int targetFPS = 60;  // Target frames-per-second
 const char* windowTitle = "Snake";
 const int initPlayerLifes = 3;  // Starting number of player lifes
+const Color BackgroundColorGameplay = {218, 237, 216, 0};
 
 // Player structure
 typedef enum PlayerDirection { LEFT, RIGHT, UP, DOWN } PlayerDirection;
@@ -34,6 +35,61 @@ typedef struct Player {
 } Player;
 
 //------------------------------------------------------------------------------------
+// Random number generators and random selectors
+//------------------------------------------------------------------------------------
+
+// Returns a random number between min and max (inclusive)
+int random_int(
+    int min,
+    int max) {  // Returns a random number between min and max (inclusive)
+  return (rand() % (max - min + 1)) + min;
+}
+
+// Returns a random float between min and max (inclusive)
+float random_float(float min, float max) {
+  return ((float)rand() / RAND_MAX) * (max - min) + min;
+}
+
+// Returns a random number between 0 and numOptions, e.g., the index of a
+// random element in an array of size numOptions
+int random_select(int numOptions) { return random_int(0, numOptions - 1); }
+
+//------------------------------------------------------------------------------------
+// Sound collection
+//------------------------------------------------------------------------------------
+
+typedef struct SoundCollection {
+  int count;
+  Sound biteSounds[10];
+} SoundCollection;
+
+SoundCollection create_sound_collection() {
+  SoundCollection soundCollection;
+  soundCollection.count = 0;
+  return soundCollection;
+}
+
+void add_sound(SoundCollection* soundCollection, Sound sound) {
+  if (soundCollection->count < 10) {
+    soundCollection->biteSounds[soundCollection->count] = sound;
+    soundCollection->count++;
+  } else {
+    printf("Sound collection is full. Cannot add more sounds.\n");
+  }
+}
+
+void play_random_sound(SoundCollection* soundCollection) {
+  int randomIndex = random_select(soundCollection->count);
+  PlaySound(soundCollection->biteSounds[randomIndex]);
+}
+
+void unload_sound_collection(SoundCollection* soundCollection) {
+  for (int i = 0; i < soundCollection->count; i++) {
+    UnloadSound(soundCollection->biteSounds[i]);
+  }
+}
+
+//------------------------------------------------------------------------------------
 // Difficulty levels
 //------------------------------------------------------------------------------------
 
@@ -55,26 +111,6 @@ DifficultyLevelSetting difficultyLevels[] = {
     {.framesPerStep = 2, .stepSize = 20, .scoreTrigger = 90},
     {.framesPerStep = 1, .stepSize = 20, .scoreTrigger = 100},
 };
-
-//------------------------------------------------------------------------------------
-// Random number generators and random selectors
-//------------------------------------------------------------------------------------
-
-// Returns a random number between min and max (inclusive)
-int random_int(
-    int min,
-    int max) {  // Returns a random number between min and max (inclusive)
-  return (rand() % (max - min + 1)) + min;
-}
-
-// Returns a random float between min and max (inclusive)
-float random_float(float min, float max) {
-  return ((float)rand() / RAND_MAX) * (max - min) + min;
-}
-
-// Returns a random number between 0 and numOptions, e.g., the index of a
-// random element in an array of size numOptions
-int random_select(int numOptions) { return random_int(0, numOptions - 1); }
 
 //------------------------------------------------------------------------------------
 // Food, obstacles and other elements
@@ -296,8 +332,8 @@ void checkCollisions(Player* player) {
   }
 }
 
-void checkIfFoundFood(Player* player, Food* food, bool* foodIsAvailable) {
-  if (food == NULL) return;
+bool checkIfFoundFood(Player* player, Food* food, bool* foodIsAvailable) {
+  if (food == NULL) return false;
   Rectangle head = {player->position.x, player->position.y, player->size.x,
                     player->size.y};
   Rectangle foodRect = {food->position.x, food->position.y, food->size.x,
@@ -307,7 +343,9 @@ void checkIfFoundFood(Player* player, Food* food, bool* foodIsAvailable) {
     player->score += food->type.points;
     free_food(food);
     *foodIsAvailable = false;
+    return true;
   }
+  return false;
 }
 
 void draw_snake_head(Player* player, Texture2D snakeHeadTexture) {
@@ -415,6 +453,29 @@ int main(void) {
   bool foodIsAvailable = false;
   Food* currentFood = NULL;
   int currentDifficultyLevel = 0;
+  InitAudioDevice();
+
+  SoundCollection biteSoundCollection = create_sound_collection();
+  add_sound(&biteSoundCollection,
+            LoadSound("assets/sound/bites/bite-var-1.mp3"));
+  add_sound(&biteSoundCollection,
+            LoadSound("assets/sound/bites/bite-var-2.wav"));
+  add_sound(&biteSoundCollection,
+            LoadSound("assets/sound/bites/bite-var-3.wav"));
+  add_sound(&biteSoundCollection,
+            LoadSound("assets/sound/bites/bite-var-4.wav"));
+  add_sound(&biteSoundCollection,
+            LoadSound("assets/sound/bites/bite-var-5.wav"));
+  add_sound(&biteSoundCollection,
+            LoadSound("assets/sound/bites/bite-var-6.wav"));
+
+  SoundCollection levelUpSoundCollection = create_sound_collection();
+  add_sound(&levelUpSoundCollection,
+            LoadSound("assets/sound/levelup/var-1.wav"));
+
+  SoundCollection gameOverSoundCollection = create_sound_collection();
+  add_sound(&gameOverSoundCollection,
+            LoadSound("assets/sound/gameover/var-1.wav"));
 
   // Initialize player
   Player startingPlayerReference = {
@@ -477,9 +538,16 @@ int main(void) {
         if (framesCounter % player->framesPerStep == 0) {
           move_player(player);
           checkCollisions(player);
-          checkIfFoundFood(player, currentFood, &foodIsAvailable);
+          bool foundFood =
+              checkIfFoundFood(player, currentFood, &foodIsAvailable);
+
+          if (foundFood) {
+            currentFood = NULL;  // checkIfFoundFood freed the eaten food.
+            play_random_sound(&biteSoundCollection);
+          }
 
           if (player->collided) {
+            play_random_sound(&gameOverSoundCollection);
             currentGameScreen = GAMEOVER;
           }
           break;
@@ -496,6 +564,7 @@ int main(void) {
               (Vector2){.x = difficultyLevels[currentDifficultyLevel].stepSize,
                         .y = difficultyLevels[currentDifficultyLevel].stepSize};
           currentDifficultyLevel++;
+          play_random_sound(&levelUpSoundCollection);
         }
 
       case GAMEOVER:
@@ -511,7 +580,7 @@ int main(void) {
     // Check current screen and draw it
     switch (currentGameScreen) {
       case GAMEPLAY:
-        ClearBackground(RAYWHITE);
+        ClearBackground(BackgroundColorGameplay);
         DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, DARKGRAY);
         DrawText(TextFormat("Score: %d", player->score), 10, 40, 20, DARKGRAY);
         // Draw snake
@@ -586,6 +655,12 @@ int main(void) {
   UnloadTexture(snakeTextures.bodyStraight);
   UnloadTexture(snakeTextures.bodyClockwiseTurn);
   UnloadTexture(snakeTextures.bodyCounterClockwiseTurn);
+
+  // Unload sounds
+  unload_sound_collection(&biteSoundCollection);
+  unload_sound_collection(&levelUpSoundCollection);
+  unload_sound_collection(&gameOverSoundCollection);
+  CloseAudioDevice();
   //--------------------------------------------------------------------------------------
 
   return 0;
