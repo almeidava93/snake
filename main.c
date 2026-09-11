@@ -98,17 +98,17 @@ FoodType foodTypes[] = {{.name = "Apple",
                          .points = 2,
                          .probability = 0.2,
                          .color = ORANGE,
-                         .texturePath = "assets/apple.png"},
+                         .texturePath = "assets/orange.png"},
                         {.name = "Banana",
                          .points = 3,
                          .probability = 0.1,
                          .color = YELLOW,
                          .texturePath = "assets/banana.png"},
-                        {.name = "Grapes",
+                        {.name = "Grape",
                          .points = 4,
                          .probability = 0.05,
                          .color = PURPLE,
-                         .texturePath = "assets/apple.png"},
+                         .texturePath = "assets/grape.png"},
                         {.name = "Watermelon",
                          .points = 5,
                          .probability = 0.05,
@@ -310,6 +310,87 @@ void checkIfFoundFood(Player* player, Food* food, bool* foodIsAvailable) {
   }
 }
 
+void draw_snake_head(Player* player, Texture2D snakeHeadTexture) {
+  float scale = 1.0;
+  float rotation;
+  switch (player->direction) {
+    case LEFT:
+      rotation = 0.0f;
+      break;
+    case RIGHT:
+      rotation = 180.0f;
+      break;
+    case UP:
+      rotation = 90.0f;
+      break;
+    case DOWN:
+      rotation = 270.0f;
+      break;
+  }
+
+  // Define the source rectangle (the whole texture)
+  Rectangle sourceRec = {0.0f, 0.0f, (float)snakeHeadTexture.width,
+                         (float)snakeHeadTexture.height};
+
+  // Define destination rectangle (position and scaled size on screen)
+  Rectangle destRec = {
+      player->position.x + (float)snakeHeadTexture.width * scale * 0.5f,
+      player->position.y + (float)snakeHeadTexture.height * scale * 0.5f,
+      (float)snakeHeadTexture.width * scale,
+      (float)snakeHeadTexture.height * scale};
+
+  // Set origin to the center of the destination rectangle (pivot point)
+  Vector2 origin = {(float)snakeHeadTexture.width * scale * 0.5f,
+                    (float)snakeHeadTexture.height * scale * 0.5f};
+
+  // Draw with rotation around the center
+  DrawTexturePro(snakeHeadTexture, sourceRec, destRec, origin, rotation, WHITE);
+}
+
+void draw_snake_bodypart(BodyPartState* bodyPart, Texture2D snakeBodyTexture) {
+  float scale = 1.0;
+  float rotation;
+  switch (bodyPart->direction) {
+    case LEFT:
+      rotation = 0.0f;
+      break;
+    case RIGHT:
+      rotation = 180.0f;
+      break;
+    case UP:
+      rotation = 90.0f;
+      break;
+    case DOWN:
+      rotation = 270.0f;
+      break;
+  }
+
+  // Define the source rectangle (the whole texture)
+  Rectangle sourceRec = {0.0f, 0.0f, (float)snakeBodyTexture.width,
+                         (float)snakeBodyTexture.height};
+
+  // Define destination rectangle (position and scaled size on screen)
+  Rectangle destRec = {
+      bodyPart->x + (float)snakeBodyTexture.width * scale * 0.5f,
+      bodyPart->y + (float)snakeBodyTexture.height * scale * 0.5f,
+      (float)snakeBodyTexture.width * scale,
+      (float)snakeBodyTexture.height * scale};
+
+  // Set origin to the center of the destination rectangle (pivot point)
+  Vector2 origin = {(float)snakeBodyTexture.width * scale * 0.5f,
+                    (float)snakeBodyTexture.height * scale * 0.5f};
+
+  // Draw with rotation around the center
+  DrawTexturePro(snakeBodyTexture, sourceRec, destRec, origin, rotation, WHITE);
+}
+
+typedef struct SnakeTextures {
+  Texture2D head;
+  Texture2D bodyStraight;
+  Texture2D bodyClockwiseTurn;
+  Texture2D bodyCounterClockwiseTurn;
+} SnakeTextures;
+
 //------------------------------------------------------------------------------------
 // Drawing functions
 //------------------------------------------------------------------------------------
@@ -338,8 +419,9 @@ int main(void) {
   Player startingPlayerReference = {
       .position = {.x = screenWidth / 2, .y = screenHeight / 2},
       .size = {.x = 20, .y = 20},
-      .stepSize = {.x = 20, .y = 20},
-      .framesPerStep = 10,
+      .stepSize = {.x = difficultyLevels[0].stepSize,
+                   .y = difficultyLevels[0].stepSize},
+      .framesPerStep = difficultyLevels[0].framesPerStep,
       .lifes = 5,
       .numBodyParts = 10,
       .collided = false,
@@ -360,6 +442,14 @@ int main(void) {
   for (size_t i = 0; i < sizeof(foodTypes) / sizeof(FoodType); i++) {
     foodTypes[i].texture = LoadTexture(*foodTypes[i].texturePath);
   }
+  SnakeTextures snakeTextures;
+  snakeTextures.head = LoadTexture("assets/snake-head.png");
+  snakeTextures.bodyStraight =
+      LoadTexture("assets/snake-body-part-straight.png");
+  snakeTextures.bodyClockwiseTurn =
+      LoadTexture("assets/snake-body-part-clockwise-turn.png");
+  snakeTextures.bodyCounterClockwiseTurn =
+      LoadTexture("assets/snake-body-part-counter-clockwise-turn.png");
 
   // Main game loop
   while (!WindowShouldClose())  // Detect window close button or ESC key
@@ -424,14 +514,41 @@ int main(void) {
         DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, DARKGRAY);
         DrawText(TextFormat("Score: %d", player->score), 10, 40, 20, DARKGRAY);
         // Draw snake
-        DrawRectangle(player->position.x, player->position.y, player->size.x,
-                      player->size.y, BLACK);
-        for (size_t body_part_idx = 0; body_part_idx < player->numBodyParts;
-             body_part_idx++) {
+        draw_snake_head(player, snakeTextures.head);
+        PlayerDirection previousBodyPartDirection =
+            player->bodyPartsStates[player->numBodyParts - 1].direction;
+
+        for (int body_part_idx = player->numBodyParts - 1; body_part_idx >= 0;
+             body_part_idx--) {
           BodyPartState currentBodyPartState =
               player->bodyPartsStates[body_part_idx];
-          DrawRectangle(currentBodyPartState.x, currentBodyPartState.y,
-                        player->size.x, player->size.y, BLACK);
+
+          if (previousBodyPartDirection == currentBodyPartState.direction) {
+            draw_snake_bodypart(&currentBodyPartState,
+                                snakeTextures.bodyStraight);
+          } else if ((previousBodyPartDirection == LEFT &&
+                      currentBodyPartState.direction == UP) ||
+                     (previousBodyPartDirection == DOWN &&
+                      currentBodyPartState.direction == LEFT) ||
+                     (previousBodyPartDirection == RIGHT &&
+                      currentBodyPartState.direction == DOWN) ||
+                     (previousBodyPartDirection == UP &&
+                      currentBodyPartState.direction == RIGHT)) {
+            draw_snake_bodypart(&currentBodyPartState,
+                                snakeTextures.bodyClockwiseTurn);
+          } else if ((previousBodyPartDirection == LEFT &&
+                      currentBodyPartState.direction == DOWN) ||
+                     (previousBodyPartDirection == UP &&
+                      currentBodyPartState.direction == LEFT) ||
+                     (previousBodyPartDirection == RIGHT &&
+                      currentBodyPartState.direction == UP) ||
+                     (previousBodyPartDirection == DOWN &&
+                      currentBodyPartState.direction == RIGHT)) {
+            draw_snake_bodypart(&currentBodyPartState,
+                                snakeTextures.bodyCounterClockwiseTurn);
+          }
+
+          previousBodyPartDirection = currentBodyPartState.direction;
         }
 
         // Draw food
@@ -461,6 +578,10 @@ int main(void) {
   for (size_t i = 0; i < sizeof(foodTypes) / sizeof(FoodType); i++) {
     UnloadTexture(foodTypes[i].texture);
   }
+  UnloadTexture(snakeTextures.head);
+  UnloadTexture(snakeTextures.bodyStraight);
+  UnloadTexture(snakeTextures.bodyClockwiseTurn);
+  UnloadTexture(snakeTextures.bodyCounterClockwiseTurn);
   //--------------------------------------------------------------------------------------
 
   return 0;
