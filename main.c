@@ -31,28 +31,97 @@ typedef struct Player {
   bool collided;
   PlayerDirection direction;
   int bodyPartsToAdd;
+  int score;
 } Player;
+
+//------------------------------------------------------------------------------------
+// Random number generators and random selectors
+//------------------------------------------------------------------------------------
+
+// Returns a random number between min and max (inclusive)
+int random_int(
+    int min,
+    int max) {  // Returns a random number between min and max (inclusive)
+  return (rand() % (max - min + 1)) + min;
+}
+
+// Returns a random float between min and max (inclusive)
+float random_float(float min, float max) {
+  return ((float)rand() / RAND_MAX) * (max - min) + min;
+}
+
+// Returns a random number between 0 and numOptions, e.g., the index of a
+// random element in an array of size numOptions
+int random_select(int numOptions) { return random_int(0, numOptions - 1); }
 
 //------------------------------------------------------------------------------------
 // Food, obstacles and other elements
 //------------------------------------------------------------------------------------
 
-typedef enum FoodType { APPLE_FRUIT, ORANGE_FRUIT, BANANA_FRUIT } FoodType;
+typedef struct FoodType {
+  char* name[20];
+  int points;
+  float probability;
+  Color color;
+  Texture2D texture;
+  char* texturePath[100];
+} FoodType;
+
+FoodType foodTypes[] = {{.name = "Apple",
+                         .points = 1,
+                         .probability = 0.6,
+                         .color = RED,
+                         .texturePath = "assets/apple.png"},
+                        {.name = "Orange",
+                         .points = 2,
+                         .probability = 0.2,
+                         .color = ORANGE,
+                         .texturePath = "assets/apple.png"},
+                        {.name = "Banana",
+                         .points = 3,
+                         .probability = 0.1,
+                         .color = YELLOW,
+                         .texturePath = "assets/banana.png"},
+                        {.name = "Grapes",
+                         .points = 4,
+                         .probability = 0.05,
+                         .color = PURPLE,
+                         .texturePath = "assets/apple.png"},
+                        {.name = "Watermelon",
+                         .points = 5,
+                         .probability = 0.05,
+                         .color = GREEN,
+                         .texturePath = "assets/watermelon.png"}};
 
 typedef struct Food {
   Vector2 position;
   Vector2 size;
   FoodType type;
+  int points;
 } Food;
+
+FoodType sample_food_type() {
+  float randomValue = random_float(0.0, 1.0);
+  float cumulativeProbability = 0.0;
+
+  for (size_t i = 0; i < sizeof(foodTypes) / sizeof(FoodType); i++) {
+    cumulativeProbability += foodTypes[i].probability;
+    if (randomValue <= cumulativeProbability) {
+      return foodTypes[i];
+    }
+  }
+
+  // Fallback in case of rounding errors
+  return foodTypes[sizeof(foodTypes) / sizeof(FoodType) - 1];
+}
 
 Food* create_new_food(void) {
   Food* food = calloc(1, sizeof(Food));
   food->size.x = 20;
   food->size.y = 20;
-  food->type = APPLE_FRUIT;
+  food->type = sample_food_type();
 
   // Generate random position for the food
-  srand(time(NULL));  // seed random number generator with current time
   int min = 0;
   int max_x = screenWidth - food->size.x;
   int max_y = screenHeight - food->size.y;
@@ -72,8 +141,13 @@ void free_food(Food* food) {
 
 void draw_food(Food* food) {
   if (food == NULL) return;
-  DrawRectangle(food->position.x, food->position.y, food->size.x, food->size.y,
-                RED);
+
+  // DrawRectangle(food->position.x, food->position.y, food->size.x,
+  // food->size.y,      food->type.color);
+
+  Vector2 texturePosition = {food->position.x - food->size.x,
+                             food->position.y - food->size.y};
+  DrawTextureEx(food->type.texture, texturePosition, 0.0, 2.0, WHITE);
 }
 
 //------------------------------------------------------------------------------------
@@ -207,6 +281,7 @@ void checkIfFoundFood(Player* player, Food* food, bool* foodIsAvailable) {
                         food->size.y};
   if (CheckCollisionRecs(head, foodRect)) {
     player->bodyPartsToAdd++;
+    player->score += food->type.points;
     free_food(food);
     *foodIsAvailable = false;
   }
@@ -230,10 +305,10 @@ void DrawTextCentered(const char* text, int centerY, int fontSize,
 int main(void) {
   // Initialization
   //--------------------------------------------------------------------------------------
-
+  srand(time(NULL));  // seed random number generator with current time
   int framesCounter = 0;
   bool foodIsAvailable = false;
-  Food* currentFood;
+  Food* currentFood = NULL;
 
   // Initialize player
   Player startingPlayerReference = {
@@ -254,7 +329,13 @@ int main(void) {
   GameScreen currentGameScreen = GAMEPLAY;
 
   SetTargetFPS(targetFPS);  // Set our game to run at 60 frames-per-second
+
   //--------------------------------------------------------------------------------------
+  // Load Textures
+  //--------------------------------------------------------------------------------------
+  for (size_t i = 0; i < sizeof(foodTypes) / sizeof(FoodType); i++) {
+    foodTypes[i].texture = LoadTexture(*foodTypes[i].texturePath);
+  }
 
   // Main game loop
   while (!WindowShouldClose())  // Detect window close button or ESC key
@@ -267,7 +348,6 @@ int main(void) {
     // Displays
     //----------------------------------------------------------------------------------
     framesCounter++;
-    float deltaTime = GetFrameTime();
 
     switch (currentGameScreen) {
       case GAMEPLAY:
@@ -303,7 +383,7 @@ int main(void) {
       case GAMEPLAY:
         ClearBackground(RAYWHITE);
         DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, DARKGRAY);
-
+        DrawText(TextFormat("Score: %d", player->score), 10, 40, 20, DARKGRAY);
         // Draw snake
         DrawRectangle(player->position.x, player->position.y, player->size.x,
                       player->size.y, BLACK);
@@ -337,6 +417,11 @@ int main(void) {
   CloseWindow();  // Close window and OpenGL context
   free_player(player);
   free_food(currentFood);
+
+  // Unload textures
+  for (size_t i = 0; i < sizeof(foodTypes) / sizeof(FoodType); i++) {
+    UnloadTexture(foodTypes[i].texture);
+  }
   //--------------------------------------------------------------------------------------
 
   return 0;
