@@ -347,10 +347,11 @@ void draw_snake_head(Player* player, Texture2D snakeHeadTexture) {
   DrawTexturePro(snakeHeadTexture, sourceRec, destRec, origin, rotation, WHITE);
 }
 
-void draw_snake_bodypart(BodyPartState* bodyPart, Texture2D snakeBodyTexture) {
+void draw_snake_bodypart(BodyPartState* bodyPart, Texture2D snakeBodyTexture,
+                         PlayerDirection rotationDirection) {
   float scale = 1.0;
   float rotation;
-  switch (bodyPart->direction) {
+  switch (rotationDirection) {
     case LEFT:
       rotation = 0.0f;
       break;
@@ -525,7 +526,8 @@ int main(void) {
 
           if (previousBodyPartDirection == currentBodyPartState.direction) {
             draw_snake_bodypart(&currentBodyPartState,
-                                snakeTextures.bodyStraight);
+                                snakeTextures.bodyStraight,
+                                currentBodyPartState.direction);
           } else if ((previousBodyPartDirection == LEFT &&
                       currentBodyPartState.direction == UP) ||
                      (previousBodyPartDirection == DOWN &&
@@ -535,7 +537,8 @@ int main(void) {
                      (previousBodyPartDirection == UP &&
                       currentBodyPartState.direction == RIGHT)) {
             draw_snake_bodypart(&currentBodyPartState,
-                                snakeTextures.bodyClockwiseTurn);
+                                snakeTextures.bodyClockwiseTurn,
+                                previousBodyPartDirection);
           } else if ((previousBodyPartDirection == LEFT &&
                       currentBodyPartState.direction == DOWN) ||
                      (previousBodyPartDirection == UP &&
@@ -545,7 +548,8 @@ int main(void) {
                      (previousBodyPartDirection == DOWN &&
                       currentBodyPartState.direction == RIGHT)) {
             draw_snake_bodypart(&currentBodyPartState,
-                                snakeTextures.bodyCounterClockwiseTurn);
+                                snakeTextures.bodyCounterClockwiseTurn,
+                                previousBodyPartDirection);
           }
 
           previousBodyPartDirection = currentBodyPartState.direction;
