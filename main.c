@@ -24,7 +24,6 @@ typedef struct Player {
   Vector2 stepSize;
   int framesPerStep;
   Vector2 size;
-  Rectangle bounds;
   int lifes;
   int numBodyParts;
   BodyPartState bodyPartsStates[100];
@@ -33,6 +32,29 @@ typedef struct Player {
   int bodyPartsToAdd;
   int score;
 } Player;
+
+//------------------------------------------------------------------------------------
+// Difficulty levels
+//------------------------------------------------------------------------------------
+
+typedef struct DifficultyLevelSetting {
+  int framesPerStep;
+  int stepSize;
+  int scoreTrigger;
+} DifficultyLevelSetting;
+
+DifficultyLevelSetting difficultyLevels[] = {
+    {.framesPerStep = 10, .stepSize = 20, .scoreTrigger = 10},
+    {.framesPerStep = 9, .stepSize = 20, .scoreTrigger = 20},
+    {.framesPerStep = 8, .stepSize = 20, .scoreTrigger = 30},
+    {.framesPerStep = 7, .stepSize = 20, .scoreTrigger = 40},
+    {.framesPerStep = 6, .stepSize = 20, .scoreTrigger = 50},
+    {.framesPerStep = 5, .stepSize = 20, .scoreTrigger = 60},
+    {.framesPerStep = 4, .stepSize = 20, .scoreTrigger = 70},
+    {.framesPerStep = 3, .stepSize = 20, .scoreTrigger = 80},
+    {.framesPerStep = 2, .stepSize = 20, .scoreTrigger = 90},
+    {.framesPerStep = 1, .stepSize = 20, .scoreTrigger = 100},
+};
 
 //------------------------------------------------------------------------------------
 // Random number generators and random selectors
@@ -144,10 +166,11 @@ void draw_food(Food* food) {
 
   // DrawRectangle(food->position.x, food->position.y, food->size.x,
   // food->size.y,      food->type.color);
-
-  Vector2 texturePosition = {food->position.x - food->size.x,
-                             food->position.y - food->size.y};
-  DrawTextureEx(food->type.texture, texturePosition, 0.0, 2.0, WHITE);
+  float scale = 1.5;
+  float rotation = 0.0;
+  Vector2 texturePosition = {food->position.x - (food->size.x * scale) / 2,
+                             food->position.y - (food->size.y * scale) / 2};
+  DrawTextureEx(food->type.texture, texturePosition, rotation, scale, WHITE);
 }
 
 //------------------------------------------------------------------------------------
@@ -309,6 +332,7 @@ int main(void) {
   int framesCounter = 0;
   bool foodIsAvailable = false;
   Food* currentFood = NULL;
+  int currentDifficultyLevel = 0;
 
   // Initialize player
   Player startingPlayerReference = {
@@ -351,11 +375,13 @@ int main(void) {
 
     switch (currentGameScreen) {
       case GAMEPLAY:
+        // Food
         if (foodIsAvailable == false) {
           currentFood = create_new_food();
           foodIsAvailable = true;
         }
 
+        // Movement
         update_player_direction(player);
         if (framesCounter % player->framesPerStep == 0) {
           move_player(player);
@@ -366,6 +392,19 @@ int main(void) {
             currentGameScreen = GAMEOVER;
           }
           break;
+        }
+
+        // Difficulty level
+        if (player->score >=
+                difficultyLevels[currentDifficultyLevel].scoreTrigger &&
+            currentDifficultyLevel <
+                sizeof(difficultyLevels) / sizeof(DifficultyLevelSetting) - 1) {
+          player->framesPerStep =
+              difficultyLevels[currentDifficultyLevel].framesPerStep;
+          player->stepSize =
+              (Vector2){.x = difficultyLevels[currentDifficultyLevel].stepSize,
+                        .y = difficultyLevels[currentDifficultyLevel].stepSize};
+          currentDifficultyLevel++;
         }
 
       case GAMEOVER:
